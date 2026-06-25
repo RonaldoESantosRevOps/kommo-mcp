@@ -223,6 +223,144 @@ const TOOLS = [
     },
   },
   {
+    name: "kommo_create_contact",
+    description: "Cria um contato. Telefone/email viram custom fields PHONE/EMAIL automaticamente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nome completo (ou use first_name/last_name)" },
+        first_name: { type: "string" },
+        last_name: { type: "string" },
+        phone: { type: "string" },
+        email: { type: "string" },
+        responsible_user_id: { type: "integer" },
+        custom_fields_values: { type: "array", items: { type: "object" } },
+      },
+    },
+  },
+  {
+    name: "kommo_update_contact",
+    description: "Atualiza um contato existente (nome, responsável, campos custom).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        contact_id: { type: "integer" },
+        name: { type: "string" },
+        first_name: { type: "string" },
+        last_name: { type: "string" },
+        responsible_user_id: { type: "integer" },
+        custom_fields_values: { type: "array", items: { type: "object" } },
+      },
+      required: ["contact_id"],
+    },
+  },
+  {
+    name: "kommo_search_companies",
+    description: "Busca empresas por texto (nome, etc.).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        limit: { type: "integer", default: 50, maximum: 250 },
+        page: { type: "integer", default: 1 },
+      },
+    },
+  },
+  {
+    name: "kommo_create_company",
+    description: "Cria uma empresa.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        responsible_user_id: { type: "integer" },
+        custom_fields_values: { type: "array", items: { type: "object" } },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "kommo_update_company",
+    description: "Atualiza uma empresa existente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company_id: { type: "integer" },
+        name: { type: "string" },
+        responsible_user_id: { type: "integer" },
+        custom_fields_values: { type: "array", items: { type: "object" } },
+      },
+      required: ["company_id"],
+    },
+  },
+  {
+    name: "kommo_link",
+    description: "Vincula uma entidade a outra (ex.: contato↔lead, empresa↔lead/contato).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: ["leads", "contacts", "companies"] },
+        entity_id: { type: "integer" },
+        to_entity_type: { type: "string", enum: ["leads", "contacts", "companies"] },
+        to_entity_id: { type: "integer" },
+      },
+      required: ["entity", "entity_id", "to_entity_type", "to_entity_id"],
+    },
+  },
+  {
+    name: "kommo_list_webhooks",
+    description: "Lista os webhooks configurados na conta (destino e eventos assinados).",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "kommo_subscribe_webhook",
+    description: "Assina um webhook: envia eventos da Kommo para uma URL. settings = lista de eventos (ex.: add_lead, status_lead, update_lead, add_contact, add_task).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        destination: { type: "string", description: "URL HTTPS que receberá os eventos" },
+        settings: { type: "array", items: { type: "string" }, description: "Eventos a assinar" },
+      },
+      required: ["destination", "settings"],
+    },
+  },
+  {
+    name: "kommo_delete_webhook",
+    description: "Remove (cancela) um webhook pela URL de destino.",
+    inputSchema: {
+      type: "object",
+      properties: { destination: { type: "string" } },
+      required: ["destination"],
+    },
+  },
+  {
+    name: "kommo_create_custom_field",
+    description: "Cria um campo personalizado numa entidade. type: text, numeric, select, multiselect, date, url, checkbox, textarea, etc. Para select/multiselect, passe enums.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: ["leads", "contacts", "companies"], default: "leads" },
+        name: { type: "string" },
+        type: { type: "string", default: "text" },
+        enums: { type: "array", items: { type: "string" }, description: "Opções (para select/multiselect)" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "kommo_update_custom_field",
+    description: "Atualiza um campo personalizado (renomear, etc.).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: ["leads", "contacts", "companies"], default: "leads" },
+        field_id: { type: "integer" },
+        name: { type: "string" },
+      },
+      required: ["field_id"],
+    },
+  },
+  {
     name: "kommo_request",
     description: "Passthrough genérico autenticado da API v4 da Kommo, para qualquer coisa não coberta pelas tools acima. path relativo (ex.: '/companies'). Cuidado: PATCH/POST/DELETE alteram dados.",
     inputSchema: {
@@ -387,6 +525,80 @@ async function handle(name, a = {}) {
       if (a.sort !== undefined) body.sort = a.sort;
       if (a.color) body.color = a.color;
       return await kommo("PATCH", `/leads/pipelines/${a.pipeline_id}/statuses/${a.status_id}`, { body });
+    }
+
+    case "kommo_create_contact": {
+      const c = {};
+      if (a.name) c.name = a.name;
+      if (a.first_name) c.first_name = a.first_name;
+      if (a.last_name) c.last_name = a.last_name;
+      if (a.responsible_user_id) c.responsible_user_id = a.responsible_user_id;
+      const cfv = [];
+      if (a.phone) cfv.push({ field_code: "PHONE", values: [{ value: a.phone, enum_code: "WORK" }] });
+      if (a.email) cfv.push({ field_code: "EMAIL", values: [{ value: a.email, enum_code: "WORK" }] });
+      if (a.custom_fields_values) cfv.push(...a.custom_fields_values);
+      if (cfv.length) c.custom_fields_values = cfv;
+      return await kommo("POST", "/contacts", { body: [c] });
+    }
+
+    case "kommo_update_contact": {
+      const body = { id: a.contact_id };
+      for (const k of ["name", "first_name", "last_name", "responsible_user_id", "custom_fields_values"]) {
+        if (a[k] !== undefined) body[k] = a[k];
+      }
+      return await kommo("PATCH", `/contacts/${a.contact_id}`, { body });
+    }
+
+    case "kommo_search_companies": {
+      const query = { limit: a.limit || 50, page: a.page || 1 };
+      if (a.query) query.query = a.query;
+      const d = await kommo("GET", "/companies", { query });
+      return d?._embedded?.companies || [];
+    }
+
+    case "kommo_create_company": {
+      const c = { name: a.name };
+      if (a.responsible_user_id) c.responsible_user_id = a.responsible_user_id;
+      if (a.custom_fields_values) c.custom_fields_values = a.custom_fields_values;
+      return await kommo("POST", "/companies", { body: [c] });
+    }
+
+    case "kommo_update_company": {
+      const body = { id: a.company_id };
+      for (const k of ["name", "responsible_user_id", "custom_fields_values"]) {
+        if (a[k] !== undefined) body[k] = a[k];
+      }
+      return await kommo("PATCH", `/companies/${a.company_id}`, { body });
+    }
+
+    case "kommo_link":
+      return await kommo("POST", `/${a.entity}/${a.entity_id}/link`, {
+        body: [{ to_entity_id: a.to_entity_id, to_entity_type: a.to_entity_type }],
+      });
+
+    case "kommo_list_webhooks": {
+      const d = await kommo("GET", "/webhooks");
+      return d?._embedded?.webhooks || [];
+    }
+
+    case "kommo_subscribe_webhook":
+      return await kommo("POST", "/webhooks", { body: { destination: a.destination, settings: a.settings } });
+
+    case "kommo_delete_webhook":
+      return await kommo("DELETE", "/webhooks", { body: { destination: a.destination } });
+
+    case "kommo_create_custom_field": {
+      const entity = a.entity || "leads";
+      const field = { name: a.name, type: a.type || "text" };
+      if (a.enums && a.enums.length) field.enums = a.enums.map((v, i) => ({ value: v, sort: (i + 1) * 10 }));
+      return await kommo("POST", `/${entity}/custom_fields`, { body: [field] });
+    }
+
+    case "kommo_update_custom_field": {
+      const entity = a.entity || "leads";
+      const body = {};
+      if (a.name !== undefined) body.name = a.name;
+      return await kommo("PATCH", `/${entity}/custom_fields/${a.field_id}`, { body });
     }
 
     case "kommo_request":

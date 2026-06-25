@@ -1,5 +1,9 @@
 # kommo-mcp
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-server-6E56CF)](https://modelcontextprotocol.io)
+
 Servidor [**MCP** (Model Context Protocol)](https://modelcontextprotocol.io) self-hosted para a
 **[Kommo CRM](https://www.kommo.com)** (antiga amoCRM, API v4).
 

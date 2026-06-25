@@ -1,0 +1,45 @@
+{
+  "name": "kommo-mcp",
+  "version": "1.0.0",
+  "description": "Servidor MCP self-hosted para a Kommo CRM (API v4): leads, funis/etapas, tarefas, responsáveis, eventos/auditoria e contatos.",
+  "type": "module",
+  "bin": {
+    "kommo-mcp": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "kommo.mjs",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node index.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "kommo",
+    "amocrm",
+    "crm",
+    "claude",
+    "claude-code"
+  ],
+  "author": "Ronaldo E. Santos",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RonaldoESantosRevOps/kommo-mcp.git"
+  },
+  "homepage": "https://github.com/RonaldoESantosRevOps/kommo-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/RonaldoESantosRevOps/kommo-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

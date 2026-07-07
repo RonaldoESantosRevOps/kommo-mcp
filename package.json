@@ -1,7 +1,7 @@
 {
   "name": "kommo-mcp",
-  "version": "1.0.0",
-  "description": "Servidor MCP self-hosted para a Kommo CRM (API v4): leads, funis/etapas, tarefas, responsáveis, eventos/auditoria e contatos.",
+  "version": "2.0.0",
+  "description": "Servidor MCP self-hosted para a Kommo CRM (API v4): leads, funis, tarefas, conversas (talks), Inbox, tags, catálogo, eventos/auditoria, prompts e resources.",
   "type": "module",
   "bin": {
     "kommo-mcp": "index.mjs"

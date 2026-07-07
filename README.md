@@ -39,21 +39,30 @@ dashboards e planilhas.
 
 ## Recursos
 
-**29 tools** divididas em:
+**41 tools**, **4 prompts** e **8 resources** MCP:
 
 | Categoria | Tools |
 |---|---|
-| **Leitura** | `kommo_account`, `kommo_pipelines`, `kommo_users`, `kommo_custom_fields`, `kommo_search_leads`, `kommo_get_lead`, `kommo_list_tasks`, `kommo_search_contacts`, `kommo_search_companies`, `kommo_list_webhooks` |
-| **Auditoria** | `kommo_get_events` (feed de eventos; filtre `created_by=0` para ações de bot/automação) |
-| **Leads** | `kommo_create_lead`, `kommo_update_lead`, `kommo_change_responsible` |
-| **Tarefas & notas** | `kommo_create_task`, `kommo_complete_task`, `kommo_add_note` |
-| **Contatos & empresas** | `kommo_create_contact`, `kommo_update_contact`, `kommo_create_company`, `kommo_update_company`, `kommo_link` |
+| **Leitura** | `kommo_account`, `kommo_pipelines`, `kommo_users` (com `is_active`), `kommo_custom_fields`, `kommo_search_leads`, `kommo_get_lead`, `kommo_list_tasks`, `kommo_search_contacts`, `kommo_search_companies`, `kommo_list_webhooks`, `kommo_tags`, `kommo_loss_reasons`, `kommo_catalog_elements` |
+| **Auditoria** | `kommo_get_events` (feed traduzido: etapas/autores por nome; `created_by=0` = bot/automação) |
+| **Atendimento** | `kommo_talks` (fila de conversas em tempo real), `kommo_close_talk`, `kommo_unsorted` (Inbox), `kommo_unsorted_accept`, `kommo_unsorted_decline` |
+| **Leads** | `kommo_create_lead`, `kommo_update_lead` (com tags), `kommo_change_responsible`, `kommo_bulk_update_leads` (lote com fatiamento) |
+| **Tarefas & notas** | `kommo_create_task` (tipos reais da conta na descrição), `kommo_complete_task`, `kommo_add_note` (common/call_in/call_out) |
+| **Contatos & empresas** | `kommo_create_contact`, `kommo_update_contact`, `kommo_create_company`, `kommo_update_company`, `kommo_link` (inclui catalog_elements) |
 | **Funis/etapas** | `kommo_create_status`, `kommo_update_status` |
 | **Webhooks** | `kommo_subscribe_webhook`, `kommo_delete_webhook` |
-| **Campos custom** | `kommo_create_custom_field`, `kommo_update_custom_field` |
-| **Genérico** | `kommo_request` (passthrough autenticado para qualquer endpoint da API v4) |
+| **Campos custom** | `kommo_create_custom_field`, `kommo_update_custom_field` (com `add_enums`) |
+| **Catálogo & arquivos** | `kommo_create_catalog_element`, `kommo_upload_file` |
+| **Automação** | `kommo_run_salesbot` (dispara bot num lead; sempre confirme antes) |
+| **Genérico** | `kommo_request` (passthrough autenticado, restrito a hosts `*.kommo.com` da conta) |
 
-A referência completa de parâmetros está [mais abaixo](#referência-das-tools).
+**Formato de resposta:** listagens devolvem `{ items, page, has_more }` com itens **resumidos e legíveis**
+(funil/etapa/responsável por nome, telefone do contato principal, datas no fuso da conta); `raw: true`
+devolve o payload cru da API. Todas as tools declaram MCP annotations (`readOnlyHint`/`destructiveHint`),
+então clientes conseguem liberar leituras e travar escritas por protocolo.
+
+**Prompts** (viram comandos no cliente MCP): `auditoria-do-dia`, `fila-agora`, `leads-parados`, `relatorio-perdas`.
+**Resources**: `kommo://account`, `kommo://pipelines`, `kommo://users`, `kommo://custom-fields/{leads,contacts,companies}`, `kommo://loss-reasons`, `kommo://task-types`.
 
 ---
 
@@ -120,14 +129,20 @@ Esse smoke test sobe o servidor via protocolo MCP e chama tools de leitura contr
 Saída esperada (resumida):
 
 ```
-✓ tools expostas: 29
+✓ tools expostas: 41
+✓ annotations ok (16 tools read-only)
+✓ allowlist bloqueia host externo no passthrough
 ✓ kommo_account -> <Nome da sua conta> (id ..., BRL)
 ✓ kommo_pipelines -> N funis; principal: ...
-✓ kommo_users -> N usuários: ...
-✓ kommo_search_leads(limit 3) -> 3 leads
-✓ kommo_get_events(created_by=0, limit 5) -> 5 eventos de bot/sistema
+✓ kommo_users -> N usuários (M inativos: ...)
+✓ kommo_search_leads -> resumo ok; ...
+✓ kommo_get_events -> 5 eventos traduzidos (autor, etapas por nome, ISO)
+✓ kommo_talks / kommo_unsorted / kommo_tags / kommo_loss_reasons ...
 ✓ SMOKE OK
 ```
+
+O teste de escrita opcional (`node smoke.mjs --write`) faz um round-trip inofensivo de webhook
+(assina, confere e remove), sem tocar em leads ou contatos.
 
 Se aparecer `HTTP 401 Invalid user name or password`, veja [Troubleshooting](#troubleshooting).
 
@@ -183,15 +198,22 @@ tools de leitura** (consultas) e manter as de escrita sempre pedindo OK. No seu
       "mcp__kommo__kommo_search_contacts",
       "mcp__kommo__kommo_search_companies",
       "mcp__kommo__kommo_list_webhooks",
-      "mcp__kommo__kommo_get_events"
+      "mcp__kommo__kommo_get_events",
+      "mcp__kommo__kommo_tags",
+      "mcp__kommo__kommo_loss_reasons",
+      "mcp__kommo__kommo_talks",
+      "mcp__kommo__kommo_unsorted",
+      "mcp__kommo__kommo_catalog_elements"
     ]
   }
 }
 ```
 
 Todas as tools de escrita (criar/editar leads, contatos, empresas, tarefas, notas, etapas,
-campos custom, vínculos e webhooks) e o passthrough `kommo_request` **continuam pedindo
-confirmação** — o comportamento seguro recomendado.
+campos custom, vínculos, webhooks, lotes, Inbox accept/decline, Salesbot e upload) e o
+passthrough `kommo_request` **continuam pedindo confirmação** — o comportamento seguro
+recomendado. As 16 tools de leitura também declaram `readOnlyHint: true` via MCP annotations,
+então clientes que respeitam annotations já as tratam como seguras.
 
 ### Exemplos de uso (linguagem natural)
 
@@ -229,38 +251,53 @@ Como o `.env` é lido a partir da pasta do servidor, não é necessário passar 
 ## Referência das tools
 
 > Datas aceitam ISO (`2026-06-26T10:00`) ou epoch. IDs de funil/etapa/usuário você descobre com
-> `kommo_pipelines` e `kommo_users`.
+> `kommo_pipelines` e `kommo_users`. Listagens devolvem `{ items, page, has_more }`; onde houver
+> `raw`, `raw: true` devolve o payload cru da API.
 
 ### Leitura
 
 | Tool | Parâmetros principais | O que faz |
 |---|---|---|
 | `kommo_account` | — | Dados da conta (confirma a conexão). |
-| `kommo_pipelines` | — | Lista funis e suas etapas (`id`, `name`, `sort`). |
-| `kommo_users` | — | Lista usuários (`id`, `name`, `email`). |
+| `kommo_pipelines` | — | Lista funis e suas etapas (`id`, `name`, `sort`, `type`). |
+| `kommo_users` | — | Lista usuários com `is_active`/`is_admin` (não atribua a inativos). |
 | `kommo_custom_fields` | `entity` (`leads`/`contacts`/`companies`) | Lista campos personalizados e seus `id`. |
-| `kommo_search_leads` | `query`, `pipeline_id`, `status_id`, `responsible_user_id`, `limit`, `page` | Busca leads com contatos embutidos. |
-| `kommo_get_lead` | `lead_id`, `note_limit` | Detalhe de um lead; anexa as últimas notas se `note_limit>0`. |
-| `kommo_list_tasks` | `responsible_user_id`, `entity_id`, `entity_type`, `is_completed`, `limit`, `page` | Lista tarefas. |
-| `kommo_search_contacts` | `query`, `limit`, `page` | Busca contatos por texto/telefone/email. |
-| `kommo_search_companies` | `query`, `limit`, `page` | Busca empresas por texto. |
+| `kommo_search_leads` | `query`, `pipeline_id`, `status_id` (resolve o funil sozinho), `responsible_user_id`, `created_from/to`, `updated_from/to`, `order_by`, `fields[]`, `raw`, `limit`, `page` | Busca leads resumidos (funil/etapa/responsável por nome, telefone, tags, motivo de perda). |
+| `kommo_get_lead` | `lead_id`*, `note_limit` | Detalhe cru de um lead (contatos, catálogo, motivo de perda); anexa notas se `note_limit>0`. |
+| `kommo_list_tasks` | `responsible_user_id`, `entity_id`, `entity_type`, `is_completed`, `limit`, `page` | Lista tarefas resumidas. |
+| `kommo_search_contacts` | `query`, `raw`, `limit`, `page` | Busca contatos (telefone/email extraídos). |
+| `kommo_search_companies` | `query`, `raw`, `limit`, `page` | Busca empresas. |
 | `kommo_list_webhooks` | — | Lista os webhooks configurados (destino e eventos). |
+| `kommo_tags` | `entity`, `query`, `limit`, `page` | Lista tags (id, nome, cor). |
+| `kommo_loss_reasons` | — | Lista os motivos de perda configurados. |
+| `kommo_catalog_elements` | `catalog_id`*, `query`, `limit`, `page` | Lista elementos de um catálogo (produtos/serviços). |
 
 ### Auditoria
 
 | Tool | Parâmetros principais | O que faz |
 |---|---|---|
-| `kommo_get_events` | `entity`, `entity_id`, `type[]`, `created_by[]`, `from`, `to`, `limit`, `page` | Feed de eventos. **`created_by=0` = ações de bot/automação.** Útil para entender o que mudou, quando e por quem. |
+| `kommo_get_events` | `entity`, `entity_id`, `type[]`, `created_by[]`, `from`, `to`, `raw`, `limit`, `page` | Feed de eventos **traduzido** (etapas e autores por nome, datas no fuso da conta). **`created_by=0` = ações de bot/automação.** |
 
-### Escrita
+### Atendimento & Inbox
 
 | Tool | Parâmetros principais | O que faz |
 |---|---|---|
-| `kommo_create_lead` | `name`*, `price`, `pipeline_id`, `status_id`, `responsible_user_id`, `contact_name`, `contact_phone`, `custom_fields_values` | Cria lead; vincula contato se informado. |
-| `kommo_update_lead` | `lead_id`*, `name`, `price`, `status_id`, `pipeline_id`, `responsible_user_id`, `custom_fields_values` | Atualiza lead (mover etapa/funil, preço, etc.). |
-| `kommo_change_responsible` | `lead_ids[]`*, `responsible_user_id`* | Troca o responsável de vários leads de uma vez. |
-| `kommo_add_note` | `entity_id`*, `text`*, `entity` | Adiciona nota a um lead/contato/empresa. |
-| `kommo_create_task` | `text`*, `entity_id`, `entity`, `complete_till`, `responsible_user_id`, `task_type_id` | Cria tarefa (prazo padrão: +1 dia). |
+| `kommo_talks` | `is_in_work`, `is_read`, `contact_id`, `limit`, `page` | Fila de conversas (chats) em tempo real. |
+| `kommo_close_talk` | `talk_id`*, `force_close` | Fecha uma conversa. |
+| `kommo_unsorted` | `category`, `pipeline_id`, `summary`, `limit`, `page` | Inbox de leads não distribuídos (`summary: true` = agregado). |
+| `kommo_unsorted_accept` | `uid`*, `user_id`, `status_id` | Aceita um item do Inbox (vira lead ativo). |
+| `kommo_unsorted_decline` | `uid`*, `user_id` | Rejeita um item do Inbox (difícil de desfazer). |
+
+### Escrita em leads
+
+| Tool | Parâmetros principais | O que faz |
+|---|---|---|
+| `kommo_create_lead` | `name`*, `price`, `pipeline_id`, `status_id`, `responsible_user_id`, `contact_name`, `contact_phone`, `tags[]`, `custom_fields_values` | Cria lead; vincula contato se informado. |
+| `kommo_update_lead` | `lead_id`*, `name`, `price`, `status_id`, `pipeline_id`, `responsible_user_id`, `loss_reason_id`, `tags_to_add[]`, `tags_to_remove[]`, `custom_fields_values` | Atualiza lead; tags são mescladas preservando as existentes. |
+| `kommo_change_responsible` | `lead_ids[]`*, `responsible_user_id`* | Troca o responsável em lote (fatiamento automático). |
+| `kommo_bulk_update_leads` | `lead_ids[]`*, `status_id`, `pipeline_id`, `responsible_user_id`, `price`, `loss_reason_id`, `tags_to_add[]` | Atualização em massa com blocos de 200 e relatório de sucesso/falha. |
+| `kommo_add_note` | `entity_id`*, `text`*, `entity`, `note_type` (`common`/`call_in`/`call_out`), `params_extra` | Adiciona nota ou registro de ligação. |
+| `kommo_create_task` | `text`*, `entity_id`, `entity`, `complete_till`, `responsible_user_id`, `task_type_id` (tipos reais da conta na descrição) | Cria tarefa (prazo padrão: +1 dia). |
 | `kommo_complete_task` | `task_id`*, `result` | Conclui uma tarefa com resultado opcional. |
 
 ### Contatos & empresas
@@ -271,7 +308,7 @@ Como o `.env` é lido a partir da pasta do servidor, não é necessário passar 
 | `kommo_update_contact` | `contact_id`*, `name`, `responsible_user_id`, `custom_fields_values` | Atualiza um contato. |
 | `kommo_create_company` | `name`*, `responsible_user_id`, `custom_fields_values` | Cria empresa. |
 | `kommo_update_company` | `company_id`*, `name`, `responsible_user_id`, `custom_fields_values` | Atualiza uma empresa. |
-| `kommo_link` | `entity`*, `entity_id`*, `to_entity_type`*, `to_entity_id`* | Vincula entidades (ex.: contato↔lead, empresa↔lead). |
+| `kommo_link` | `entity`*, `entity_id`*, `to_entity_type`* (inclui `catalog_elements`), `to_entity_id`*, `catalog_id`, `quantity` | Vincula entidades, inclusive produto/procedimento a lead. |
 
 ### Funis/etapas
 
@@ -292,13 +329,21 @@ Como o `.env` é lido a partir da pasta do servidor, não é necessário passar 
 | Tool | Parâmetros principais | O que faz |
 |---|---|---|
 | `kommo_create_custom_field` | `entity`, `name`*, `type`, `enums` | Cria campo custom (use `enums` para select/multiselect). |
-| `kommo_update_custom_field` | `entity`, `field_id`*, `name` | Atualiza/renomeia um campo custom. |
+| `kommo_update_custom_field` | `entity`, `field_id`*, `name`, `add_enums[]` | Renomeia e/ou acrescenta opções a um select preservando as existentes. |
+
+### Catálogo, arquivos e automação
+
+| Tool | Parâmetros principais | O que faz |
+|---|---|---|
+| `kommo_create_catalog_element` | `catalog_id`*, `name`*, `custom_fields_values` | Cria um elemento (ex.: procedimento com preço). |
+| `kommo_upload_file` | `file_path`*, `file_name`, `entity`, `entity_id` | Sobe arquivo ao drive e anexa à entidade, se informada. |
+| `kommo_run_salesbot` | `bot_id`*, `entity_id`*, `entity_type` | **Dispara um Salesbot num lead (envia mensagens reais). Confirme sempre.** |
 
 ### Genérico
 
 | Tool | Parâmetros principais | O que faz |
 |---|---|---|
-| `kommo_request` | `method`, `path`*, `query`, `body` | Chamada autenticada a qualquer endpoint da API v4. |
+| `kommo_request` | `method`, `path`*, `query`, `body` | Chamada autenticada a qualquer endpoint; restrita a hosts `*.kommo.com` da conta. |
 
 `*` = obrigatório.
 
@@ -308,9 +353,9 @@ Como o `.env` é lido a partir da pasta do servidor, não é necessário passar 
 
 ```
 kommo-mcp/
-├── index.mjs        # Servidor MCP: define as 29 tools e o transporte stdio
-├── kommo.mjs        # Cliente HTTP da API v4 + carregador de .env (sem dependências extras)
-├── smoke.mjs        # Teste end-to-end: sobe o server e chama tools de leitura
+├── index.mjs        # Servidor MCP: 41 tools, 4 prompts, 8 resources, transporte stdio
+├── kommo.mjs        # Cliente HTTP (allowlist de hosts, retry/backoff, timeout, cache) + .env
+├── smoke.mjs        # Teste end-to-end: sobe o server e valida contra a API real
 ├── package.json
 ├── .env.example     # Modelo das variáveis (copie para .env)
 ├── .gitignore       # Ignora .env e node_modules
@@ -322,6 +367,11 @@ kommo-mcp/
 
 ## Segurança
 
+- **Allowlist de hosts:** o cliente HTTP só envia o token para `{seu-subdomínio}.kommo.com` e
+  `drive*.kommo.com`. Mesmo que alguém induza o assistente a chamar `kommo_request` com uma URL
+  externa (prompt injection via dados do CRM), o token **não sai** da infraestrutura da Kommo.
+- **Annotations MCP:** leituras declaram `readOnlyHint`, escritas declaram `destructiveHint`,
+  permitindo que o cliente aplique permissões distintas por protocolo.
 - **Nunca** versione o `.env` (já protegido pelo `.gitignore`). Para compartilhar configuração,
   use o `.env.example`.
 - O token tem os **direitos de admin** de quem o gerou — trate como senha.
@@ -334,8 +384,14 @@ kommo-mcp/
 ## Limitações conhecidas
 
 - **Salesbot nativo da Kommo:** o *fluxo/cenário* do bot é editável **apenas pela interface** da
-  Kommo. Pela API dá para **ler tudo o que o bot fez** (via `kommo_get_events` / notas) e, via
-  `kommo_request`, disparar/parar — mas **não** redesenhar o fluxo.
+  Kommo. Pela API dá para **ler tudo o que o bot fez** (via `kommo_get_events` / notas) e
+  **dispará-lo num lead** (`kommo_run_salesbot`) — mas **não** redesenhar o fluxo.
+- **Mensagens de chat (amojo):** ler/enviar o conteúdo das conversas exige registrar um canal
+  próprio na Chats API (credencial separada); está fora do escopo deste servidor.
+- **Módulo Customers:** só funciona em contas com o módulo habilitado no plano
+  (`customers_mode` diferente de `disabled`); alcançável via `kommo_request` se for o caso.
+- **v2.x muda o formato das listagens** para `{ items, page, has_more }` com itens resumidos
+  (v1.x devolvia o array cru). Use `raw: true` onde precisar do payload original.
 
 ---
 

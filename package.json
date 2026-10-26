@@ -1,21 +1,23 @@
 {
   "name": "kommo-mcp",
-  "version": "2.0.0",
-  "description": "Servidor MCP self-hosted para a Kommo CRM (API v4): leads, funis, tarefas, conversas (talks), Inbox, tags, catálogo, eventos/auditoria, prompts e resources.",
+  "version": "2.1.0",
+  "description": "Servidor MCP self-hosted para qualquer conta Kommo (API v4). Cada instalação usa o próprio subdomínio e token; o repositório não traz dados de conta.",
   "type": "module",
   "bin": {
     "kommo-mcp": "index.mjs"
   },
   "files": [
     "index.mjs",
-    "kommo.mjs",
+    "src",
     ".env.example",
     "README.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "scripts": {
     "start": "node index.mjs",
-    "smoke": "node smoke.mjs"
+    "test": "node --test tests/unit.test.mjs tests/handlers.test.mjs tests/leak.test.mjs",
+    "smoke": "node tests/smoke.mjs"
   },
   "keywords": [
     "mcp",
@@ -23,8 +25,8 @@
     "kommo",
     "amocrm",
     "crm",
-    "claude",
-    "claude-code"
+    "cursor",
+    "claude"
   ],
   "author": "Ronaldo E. Santos",
   "license": "MIT",
@@ -40,6 +42,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0"
+    "@modelcontextprotocol/sdk": "^1.32.2"
   }
 }

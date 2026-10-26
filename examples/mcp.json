@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kommo": {
+      "command": "node",
+      "args": ["/caminho/absoluto/kommo-mcp/index.mjs"]
+    }
+  }
+}
